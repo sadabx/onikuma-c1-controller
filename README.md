@@ -1,64 +1,150 @@
-# Onikuma C1 (B20 Variant) Master Guide
+# Arch Linux Installation & Post-Install Troubleshooting Guide
 
-## 🎮 Controller Anatomy & Layout
-**Note:** This is the **Nintendo Switch-themed** edition.
-
-* **Face Buttons:** * Right = **A**
-  * Bottom = **B**
-  * Top = **X**
-  * Left = **Y**
-  *(Note: When connected to PC/Android in Xbox Mode, the PC treats Bottom as 'A' and Right as 'B'.)*
-* **Sticks:** **Hall Effect Joysticks** (Magnetic sensors, immune to stick drift).
-* **Bumpers/Triggers:** L1/L2 and R1/R2 (RB/RT).
-* **Special Buttons:**
-  * **Pairing Button:** Small button next to the USB-C port.
-  * **M Button:** Dedicated Macro programming button (front bottom-center).
-  * **T Button:** Turbo/Rapid-fire button.
-  * **ML / MR:** Programmable back paddles.
+A highly technical log detailing the comprehensive `archinstall` configuration parameters, wireless/hardware failures, resolution procedures, and shell environments.
 
 ---
 
-## 📡 Connection & Pairing Modes
+## 1. Pre-Installation Network Setup
 
-### 1. PC & Modern Android (Xbox Mode / X-Input) - *Recommended*
-* **Device Name:** `Xbox Wireless Controller`
-* **Method A (Easiest):** Press and hold the small **Pairing Button** (next to the Type-C port) for 3-5 seconds until lights flash rapidly.
-* **Method B:** Turn the controller OFF. Hold **R1 (Right Bumper)** + **Home** for 3 seconds.
+Before executing the installer, wireless connectivity must be established manually via the internet wireless daemon (`iwd`) command-line interface.
 
-### 2. Nintendo Switch Mode
-* **Device Name:** `Pro Controller`
-* **Method:** Turn controller OFF. Hold **ZR (Right Trigger)** + **Home** for 3 seconds.
+```bash
+# Launch the interactive wireless control utility
+iwctl
 
-### 3. iOS / Apple Devices (PlayStation Mode)
-* **Device Name:** `DUALSHOCK 4 Wireless Controller`
-* **Method:** Turn controller OFF. Hold **B (Bottom Face Button)** + **Home** for 3 seconds.
+# List available network interfaces (typically wlan0)
+device list
 
----
+# Scan for available access points
+station wlan0 scan
 
-## ⚙️ Hidden Features & Shortcuts
+# Display discovered networks
+station wlan0 get-networks
 
-### Turbo & Auto-Fire Modes
-Great for shooters or skipping dialogue.
-1. **Manual Turbo:** Hold **T** + press the target button (e.g., LB). Now LB rapid-fires when held.
-2. **Auto-Fire (Hands-free):** Press **T + target button** a second time. The button will trigger continuously without you touching it.
-3. **Turn OFF:** Press **T + target button** a third time.
-4. **Clear ALL Turbo:** Hold the **T** button for 5-8 seconds.
+# Connect to the target Access Point
+station wlan0 connect "WiFi-Name"
 
-### Macro Programming (ML / MR Back Buttons)
-Record a combo of inputs (like `Up + RB`) to a single back button.
-1. **Start Recording:** Press and hold the **M** button on the front for 3 seconds until the lights flash slowly or change to purple.
-2. **Input Sequence:** Press your desired buttons (e.g., `Up` and `RB` together). *Note: The controller records the exact timing and delay.*
-3. **Save:** Press the desired back button (**ML** or **MR**). The lights will return to normal.
-4. **Clear Macro:** Hold the **M** button to enter recording mode, then immediately press the back button (ML/MR) without pressing anything else.
+# Exit the utility
+exit
 
-### Vibration & Lighting
-* **Adjust Vibration Strength:** Hold **T** + press **D-Pad UP** (Stronger) or **D-Pad DOWN** (Weaker/Off).
-* **RGB Lighting:** Use the dedicated light button (sun icon) or click in the left joystick (L3) while holding Turbo to cycle colors or turn off the lights.
+# Verify network stack routing via ICMP echo requests
+ping -c 4 google.com
+
+```
 
 ---
 
-## 🛠️ Troubleshooting & Reset Guide
+## 2. Complete Archinstall Configuration Profile
 
-* **Controller acts crazy / Buttons press themselves:** You probably activated Auto-Fire accidentally. Hold the **T** button for 8 seconds to clear all settings.
-* **Connected but game doesn't respond:** You are probably in the wrong mode (e.g., connected as "Pro Controller" to a PC game). Forget the Bluetooth device and re-pair using the X-Input mode.
-* **The "Hard Reset" (Nuclear Option):** If the controller is frozen or lights are stuck, find the tiny pinhole on the back. Use a SIM ejector tool to press the button inside for 5 seconds to cut power completely.
+Execute the installer:
+
+```bash
+archinstall
+
+```
+
+To prevent post-install driver or boot failures, the interactive prompts must be configured as follows:
+
+| Menu Option | Selection / Configuration | Rationale |
+| --- | --- | --- |
+| **Language & Keyboard** | `en_US` / `us` | Standard layout mapping. |
+| **Mirrors** | Region: `Selected Region` | Restricts package fetching to local high-throughput mirrors. |
+| **Disk configuration** | Choose Target Drive -> Partition Strategy | Wipe drive and create partition layout. |
+| **Filesystem type** | `Btrfs` | Chosen over `Ext4` for copy-on-write integrity, subvolumes, and native snapshotting. |
+| **Disk encryption** | `Optional` | LUKS container encryption setup. |
+| **Bootloader** | `systemd-boot` or `GRUB` | Core EFI boot executable placement. |
+| **Unified Kernel Image** | `No` (Default) | Unless specifically required for Secure Boot chains. |
+| **Hostname** | Define system name (e.g., `arch-pc`) | Network identifier string. |
+| **Root password** | Specify alpha-numeric string | System administrator execution gate. |
+| **User account** | Add a user -> Define username & password -> **Sudo: Yes** | Standard user provisioning with elevation privileges. |
+| **Profile** | Type: `Desktop` -> DE: `KDE Plasma` | Installs the core Plasma interface. |
+| **Graphics driver** | Select vendor driver (e.g., `AMD`, `Intel`, `NVIDIA Open/Proprietary`) | Prevents display server black screens on first boot. |
+| **Audio** | `PipeWire` | Modern, low-latency sound server architecture. |
+| **Kernels** | `linux` (and optionally `linux-lts` for fallback stability) | Base operating system kernel. |
+| **Additional packages** | `git`, `vim`, `neovim`, `base-devel` | Base development tools missing from default profiles. |
+| **Network configuration** | Select `NetworkManager` | Installs user-space network control tools. |
+| **Timezone** | Select local region (e.g., `Asia/Dhaka`) | Synchronizes hardware clock (`hwclock`). |
+| **Automatic NTP** | `True` | Network Time Protocol synchronization. |
+
+---
+
+## 3. Post-Install Troubleshooting: Network & Bluetooth Subsystem Failures
+
+### Symptom
+
+Upon completing the installation and rebooting into the KDE Plasma desktop environment:
+
+* No Wi-Fi or Bluetooth applet icons appear in the system tray.
+* Running network commands reveals interfaces exist (`ip link`), but they sit in a `DOWN` state.
+* Hardware is recognized by the kernel (`lspci`, `lsusb`), but remains unmanaged.
+
+### Root Cause
+
+1. **NetworkManager Service State:** Even if `NetworkManager` was selected during `archinstall`, the backend daemon service is frequently left disabled or unstarted in the systemd configuration.
+2. **Missing UI Meta-Packages:** The `archinstall` profile pulls down the core desktop components but often misses the desktop-agnostic system tray applets (`network-manager-applet`) and full hardware middleware dependencies (`bluez`, `bluez-utils`).
+
+### Resolution Procedure
+
+> **Prerequisite:** If no local networking exists, connect an Android/iOS device via USB and enable **USB Tethering**, or connect a physical Ethernet cable. The kernel will automatically mount this interface as a wired device (e.g., `enp0s20u2`), restoring temporary package access.
+
+#### Part 1: Network Stack Restoration
+
+```bash
+# Explicitly sync databases and install the network manager plus its system tray wrapper
+sudo pacman -Sy networkmanager network-manager-applet
+
+# Force systemd to register the service and execute it immediately
+sudo systemctl enable --now NetworkManager
+
+```
+
+*Effect: The network daemon takes control of the wireless interface, and the Wi-Fi icon initializes in the KDE Plasma system tray.*
+
+#### Part 2: Bluetooth Subsystem Initialization
+
+```bash
+# Fetch the Linux Bluetooth protocol stack and CLI controller binaries
+sudo pacman -S bluez bluez-utils
+
+# Force systemd to register and start the hardware Bluetooth service
+sudo systemctl enable --now bluetooth
+
+```
+
+*Effect: KDE's Bluez integration layer automatically hooks into the active service, rendering the status applet in the tray.*
+
+---
+
+## 4. Shell Environment Configuration
+
+Append these explicit blocks to the shell configuration profile (`~/.bashrc` or `~/.zshrc`).
+
+### Prompt Definition (PS1)
+
+Overrides the default multi-variable prompt string with an optimized, lightweight terminal interface layout.
+
+```bash
+# Standard system fallback definition:
+# PS1='[\u@\h \W]\$ '
+
+# Production layout: Bold White directory path followed by a Green arrow indicator
+export PS1="\[\e[1;37m\]\W \[\e[1;32m\]❯ \[\e[0m\]"
+
+```
+
+### Environment Path Expansion
+
+Instructs the shell runtime to index the user-space local binary directories prior to scanning system-wide binary paths.
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+
+```
+
+### Static Execution Aliases
+
+Abstracts remote execution payloads into local, deterministic macro aliases.
+
+```bash
+# Fetches, inspects, and executes the client-side installer script for Vencord
+alias vencord='sh -c "$(curl -sS https://vencord.dev/install.sh)"'
